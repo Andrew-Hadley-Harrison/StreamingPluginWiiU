@@ -1,3 +1,8 @@
+$(info === DIAG WUT_ROOT=$(WUT_ROOT) ===)
+$(info === DIAG include top: $(shell ls $(WUT_ROOT)/include 2>/dev/null) ===)
+$(info === DIAG find CThread: $(shell find $(DEVKITPRO) -name 'CThread.h' 2>/dev/null | head -3) ===)
+$(info === DIAG find logger.h: $(shell find $(DEVKITPRO) -name 'logger.h' -path '*util*' 2>/dev/null | head -3) ===)
+$(info === DIAG libutilswut dir: $(shell ls -R $(WUT_ROOT)/include/libutilswut 2>/dev/null | head -20) ===)
 # Compiling the projects with libutils logging code?
 DO_LOGGING          := 1
 
