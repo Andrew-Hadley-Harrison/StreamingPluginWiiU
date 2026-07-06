@@ -20,6 +20,7 @@
 
 #include "retain_vars.hpp"
 #include <coreinit/thread.h>
+#include <utils/logger.h>
 #include <coreinit/cache.h>
 #include <nsysnet/socket.h>
 #include "crc32.h"

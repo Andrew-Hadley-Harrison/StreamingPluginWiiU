@@ -3,11 +3,11 @@ DO_LOGGING          := 1
 
 # Links against the wut implementation of newlib, this is useful for using any function
 # from the C standard library
-WUT_ENABLE_NEWLIB   := 0
+WUT_ENABLE_NEWLIB   := 1
 
 # Links against the wut implementation of stdcpp, this is useful for using any function
 # from the C++ standard library. This will enable WUT_ENABLE_NEWLIB if you have not already done so.
-WUT_ENABLE_CPP      := 0
+WUT_ENABLE_CPP      := 1
 
 # By default newlib will allocate 90% of the default heap for use with sbrk & malloc, 
 # if this is unacceptable to you then you should use this as it replaces the newlib 
@@ -35,7 +35,7 @@ COMMON_CFLAGS       :=
 # Extra C compiler flags
 CFLAGS              :=
 # Extra C++ compiler flags
-CXXFLAGS            :=
+CXXFLAGS            := -std=gnu++20
 # Extra linking flags for all linking steps
 LDFLAGS             := 
 

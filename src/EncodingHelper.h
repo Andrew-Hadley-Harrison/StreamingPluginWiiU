@@ -1,101 +1,105 @@
+/****************************************************************************
+ * Copyright (C) 2018 Maschell
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ ****************************************************************************/
+
 #ifndef __ENCODING_HELPER_H_
 #define __ENCODING_HELPER_H_
 
 #include <vector>
 #include <algorithm>
-#include <thread>
-#include <atomic>
-#include <mutex>
-#include <condition_variable>
-#include <queue>
-#include <iostream>
 
+#include <system/CThread.h>
+#include <coreinit/cache.h>
+#include <coreinit/messagequeue.h>
+#include <utils/logger.h>
 #include "MJPEGStreamServerUDP.hpp"
 
 #define ENCODE_QUEUE_MESSAGE_COUNT 1
 
+extern OSMessageQueue encodeQueue;
+extern OSMessage encodeQueueMessages[ENCODE_QUEUE_MESSAGE_COUNT];
+
+
 class EncodingHelper {
 public:
-    static EncodingHelper* getInstance() {
-        if (!instance) {
+    static EncodingHelper * getInstance() {
+        if(!instance) {
             instance = new EncodingHelper();
         }
+
         return instance;
     }
 
     static void destroyInstance() {
-        if (instance) {
+        if(instance) {
             instance->StopAsyncThread();
+            while(instance->serverRunning) {
+                OSSleepTicks(OSMicrosecondsToTicks(1000));
+            }
+            OSSleepTicks(OSMillisecondsToTicks(500));
             delete instance;
-            instance = nullptr;
+            instance = NULL;
         }
     }
 
-    static bool addFSQueueMSG(int message) {
-        std::lock_guard<std::mutex> lock(queueMutex);
-        if (encodeQueue.size() < ENCODE_QUEUE_MESSAGE_COUNT) {
-            encodeQueue.push(message);
-            cv.notify_all();
-            return true;
-        }
-        return false;
+    static bool addFSQueueMSG(OSMessage message) {
+        if(!OSSendMessage(&encodeQueue,&message,OS_MESSAGE_FLAGS_NONE)) {
+            //DEBUG_FUNCTION_LINE("Dropping frame\n");
+            return false;
+        };
+        return true;
     }
 
-    void StartAsyncThread() {
-        shouldExit = false;
-        asyncThread = std::thread(&EncodingHelper::DoAsyncThreadInternal, this);
-    }
+    void StartAsyncThread();
 
     void StopAsyncThread() {
+        DEBUG_FUNCTION_LINE("StopAsyncThread\n");
         shouldExit = true;
-        cv.notify_all();
-        if (asyncThread.joinable()) {
-            asyncThread.join();
-        }
+        DCFlushRange((void*) &shouldExit,sizeof(shouldExit));
     }
 
-    void setMJPEGStreamServer(MJPEGStreamServer* server) {
+    void setMJPEGStreamServer(MJPEGStreamServer * server){
         this->mjpegServer = server;
     }
 
-private:
-    EncodingHelper() : shouldExit(false) {
-        std::cout << "EncodingHelper initialized!" << std::endl;
-    }
-
-    void DoAsyncThreadInternal() {
-        while (!shouldExit) {
-            std::unique_lock<std::mutex> lock(queueMutex);
-            cv.wait(lock, [this] { return !encodeQueue.empty() || shouldExit; });
-
-            if (shouldExit) break;
-
-            int message = encodeQueue.front();
-            encodeQueue.pop();
-
-            // Simulate encoding or processing logic
-            std::cout << "Processing message: " << message << std::endl;
-
-            if (mjpegServer) {
-                // Assuming mjpegServer is used for streaming
-                mjpegServer->processFrame(message);
-            }
+    void setThreadPriority(int32_t priority){
+        if(pThread != NULL){
+            pThread->setThreadPriority(priority);
         }
     }
 
-    static EncodingHelper* instance;
-    std::thread asyncThread;
-    std::atomic<bool> shouldExit;
-    MJPEGStreamServer* mjpegServer = nullptr;
+private:
+    EncodingHelper() {
+        OSInitMessageQueue(&encodeQueue, encodeQueueMessages, ENCODE_QUEUE_MESSAGE_COUNT);
+        DEBUG_FUNCTION_LINE("Init queue done! \n");
+    }
 
-    static std::queue<int> encodeQueue;
-    static std::mutex queueMutex;
-    static std::condition_variable cv;
+    static void DoAsyncThread(CThread *thread, void *arg);
+
+
+    void DoAsyncThreadInternal(CThread *thread);
+
+    CThread *pThread;
+
+    MJPEGStreamServer * mjpegServer = NULL;
+
+    volatile bool serverRunning = false;
+
+    volatile bool shouldExit = false;
+
+    static EncodingHelper * instance;
 };
-
-EncodingHelper* EncodingHelper::instance = nullptr;
-std::queue<int> EncodingHelper::encodeQueue;
-std::mutex EncodingHelper::queueMutex;
-std::condition_variable EncodingHelper::cv;
-
 #endif // __ENCODING_HELPER_H_
