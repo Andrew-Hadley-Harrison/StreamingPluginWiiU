@@ -141,33 +141,49 @@ bool MJPEGStreamServerUDP::streamJPEG(JpegInformation * info) {
     return false;
 }
 
+// Per-datagram header (16 bytes, big-endian since the Wii U is big-endian):
+//   frameId    uint32   increments per frame
+//   chunkIndex uint16   0-based index of this chunk within the frame
+//   chunkCount uint16   total chunks in this frame
+//   crc32      uint32   CRC32 of the whole JPEG (same in every chunk)
+//   jpegSize   uint32   total JPEG size (same in every chunk)
+// Payload follows (fixed CHUNK_PAYLOAD bytes except the last chunk).
+#define CHUNK_HEADER  16
+#define CHUNK_PAYLOAD (MAX_UDP_SIZE - CHUNK_HEADER)   // 1400 - 16 = 1384
+
 void MJPEGStreamServerUDP::sendJPEG(uint8_t * buffer, uint64_t size) {
-    uint32_t crcValue = crc32_crc(&crc32Buffer,buffer, size);
+    uint32_t crcValue = crc32_crc(&crc32Buffer, buffer, size);
+    uint32_t jpegSize = (uint32_t) size;
 
-    // New protocol: send the WHOLE frame as a single UDP datagram:
-    //   [4B crc big-endian][8B size big-endian][jpeg]
-    // The client receives one complete frame per datagram, so a lost frame just
-    // drops (IP reassembly is all-or-nothing) instead of desyncing the stream.
-    // Wii U is big-endian, so the raw bytes of crcValue/size match Java's reads.
-    uint64_t total = 12 + size;
-    if (total > 65500) {
-        // Won't fit in a single UDP datagram; drop (keep quality/res low enough).
-        frame_counter_skipped++;
-        return;
+    // The Wii U's UDP stack cannot send datagrams larger than the MTU, so a
+    // frame is split into <=1400-byte chunks. Each chunk self-describes its
+    // frame (id + crc + size + index/count), so the client can reassemble and
+    // resync per-frame: one lost chunk drops only that frame, and the next
+    // frameId starts fresh (no cascading black screen like the old protocol).
+    uint32_t frameId    = ++frameCounter;
+    uint32_t chunkCount = (jpegSize + CHUNK_PAYLOAD - 1) / CHUNK_PAYLOAD;
+    if (chunkCount == 0) chunkCount = 1;
+
+    uint8_t packet[MAX_UDP_SIZE];
+    for (uint32_t idx = 0; idx < chunkCount; idx++) {
+        uint32_t offset     = idx * CHUNK_PAYLOAD;
+        uint32_t payloadLen = jpegSize - offset;
+        if (payloadLen > CHUNK_PAYLOAD) payloadLen = CHUNK_PAYLOAD;
+
+        uint16_t idx16   = (uint16_t) idx;
+        uint16_t count16 = (uint16_t) chunkCount;
+        memcpy(packet + 0,  &frameId,   4);
+        memcpy(packet + 4,  &idx16,     2);
+        memcpy(packet + 6,  &count16,   2);
+        memcpy(packet + 8,  &crcValue,  4);
+        memcpy(packet + 12, &jpegSize,  4);
+        memcpy(packet + 16, buffer + offset, payloadLen);
+
+        if (send(sockfd, packet, (int)(CHUNK_HEADER + payloadLen), 0) < 0) {
+            // socket error: stop sending this frame
+            break;
+        }
     }
-
-    uint8_t *packet = (uint8_t*) malloc((size_t) total);
-    if (packet == NULL) {
-        frame_counter_skipped++;
-        return;
-    }
-    memcpy(packet,     &crcValue, sizeof(crcValue)); // 4 bytes
-    memcpy(packet + 4, &size,     sizeof(size));     // 8 bytes
-    memcpy(packet + 12, buffer,   (size_t) size);
-
-    send(sockfd, packet, (int) total, 0);
-
-    free(packet);
 }
 
 bool MJPEGStreamServerUDP::sendData(uint8_t * data,int32_t length) {

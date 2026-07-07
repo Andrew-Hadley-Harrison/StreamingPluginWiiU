@@ -19,6 +19,10 @@ private:
     std::thread worker;
     std::atomic<bool> shouldExit{false};
     std::atomic<bool> connected{false};
+    // Kept so the destructor can close them to unblock accept()/recv(),
+    // otherwise worker.join() would deadlock on a blocked socket call.
+    std::atomic<int> listenSock{-1};
+    std::atomic<int> clientSock{-1};
     static HeartBeatServer *instance;
     MJPEGStreamServerUDP *mjpegStreamServer = NULL;
 };

@@ -72,6 +72,9 @@ public:
 
     crc32_t crc32Buffer;
 
+    // Increments once per frame; lets the client group chunks and resync.
+    uint32_t frameCounter = 0;
+
 private:
     MJPEGStreamServerUDP(uint32_t ip,int32_t port);
 
