@@ -35,6 +35,10 @@ MJPEGStreamServerUDP::MJPEGStreamServerUDP(uint32_t ip, int32_t port) {
         return;
     }
 
+    // Allow single UDP datagrams up to a full frame in size.
+    int sndbuf = 0x40000; // 256 KB
+    setsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf));
+
     struct sockaddr_in connect_addr;
     memset(&connect_addr, 0, sizeof(struct sockaddr_in));
     connect_addr.sin_family = AF_INET;
@@ -140,9 +144,30 @@ bool MJPEGStreamServerUDP::streamJPEG(JpegInformation * info) {
 void MJPEGStreamServerUDP::sendJPEG(uint8_t * buffer, uint64_t size) {
     uint32_t crcValue = crc32_crc(&crc32Buffer,buffer, size);
 
-    sendData((uint8_t*)&crcValue, sizeof(crcValue));
-    sendData((uint8_t*)&size, sizeof(size));
-    sendData((uint8_t*)buffer, size);
+    // New protocol: send the WHOLE frame as a single UDP datagram:
+    //   [4B crc big-endian][8B size big-endian][jpeg]
+    // The client receives one complete frame per datagram, so a lost frame just
+    // drops (IP reassembly is all-or-nothing) instead of desyncing the stream.
+    // Wii U is big-endian, so the raw bytes of crcValue/size match Java's reads.
+    uint64_t total = 12 + size;
+    if (total > 65500) {
+        // Won't fit in a single UDP datagram; drop (keep quality/res low enough).
+        frame_counter_skipped++;
+        return;
+    }
+
+    uint8_t *packet = (uint8_t*) malloc((size_t) total);
+    if (packet == NULL) {
+        frame_counter_skipped++;
+        return;
+    }
+    memcpy(packet,     &crcValue, sizeof(crcValue)); // 4 bytes
+    memcpy(packet + 4, &size,     sizeof(size));     // 8 bytes
+    memcpy(packet + 12, buffer,   (size_t) size);
+
+    send(sockfd, packet, (int) total, 0);
+
+    free(packet);
 }
 
 bool MJPEGStreamServerUDP::sendData(uint8_t * data,int32_t length) {
