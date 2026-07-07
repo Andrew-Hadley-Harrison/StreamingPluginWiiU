@@ -1,7 +1,5 @@
 #include <wups.h>
 #include <gx2/surface.h>
-#include <utils/StringTools.h>
-#include <fs/FSUtils.h>
 #include "stream_utils.h"
 #include "retain_vars.hpp"
 

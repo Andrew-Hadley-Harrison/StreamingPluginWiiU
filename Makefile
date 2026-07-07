@@ -27,16 +27,16 @@ CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 			$(MACHDEP)
 
 CFLAGS	+=	$(INCLUDE) -D__WIIU__ -D__WUT__ -D__WUPS__
-# libutils headers live at /include/libutilswut in the CI image; bundled turbojpeg in libs/
-CFLAGS	+=	-I/include/libutilswut -I$(TOPDIR)/libs/include
+# bundled turbojpeg headers in libs/include (libutils dropped; shims vendored under src/)
+CFLAGS	+=	-I$(TOPDIR)/libs/include
 
 CXXFLAGS	:= $(CFLAGS) -std=c++20
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-g $(ARCH) $(RPXSPECS) -Wl,-Map,$(notdir $*.map) $(WUPSSPECS)
 
-# libutilswut.a is at /lib, turbojpeg in libs/lib. Order: consumers before deps.
-LIBS	:= -L/lib -L$(TOPDIR)/libs/lib -lwups -lutilswut -lturbojpeg -lwut
+# bundled turbojpeg in libs/lib. Order: consumers before deps.
+LIBS	:= -L$(TOPDIR)/libs/lib -lwups -lturbojpeg -lwut
 
 #-------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level

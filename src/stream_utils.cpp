@@ -2,7 +2,6 @@
 #include "retain_vars.hpp"
 #include "EncodingHelper.h"
 #include "HeartBeatServer.hpp"
-#include <fs/FSUtils.h>
 #include <malloc.h>
 
 #include <gx2/event.h>
