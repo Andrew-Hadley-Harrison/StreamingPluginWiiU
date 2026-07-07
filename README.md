@@ -1,4 +1,43 @@
-# ScreenStreaming for the Wii U [![Build Status](https://api.travis-ci.org/Maschell/StreamingPluginWiiU.svg?branch=master)](https://travis-ci.org/Maschell/StreamingPluginWiiU)
+# ScreenStreaming for the Wii U
+
+> ## ⚠️ STATUS: DOES NOT WORK (as of July 2026) — archived attempt
+>
+> **This fork does not produce a usable video stream.** I ported the abandoned
+> 2018 plugin to modern Aroma and got most of the pipeline working, but the
+> actual screen capture never yields a correct image, so it is not usable for
+> streaming your Wii U screen. Sharing the findings so others don't repeat the
+> same dead ends.
+>
+> **What works (all fixed/verified on real hardware, Aroma 2026):**
+> - Builds against the current toolchain — devkitPPC `20260225` + WUPS
+>   `20260418` (the same tags the official `ftpiiu` plugin uses). The old
+>   `wiiuwut/libutils:0.1` dependency was dropped (its 2018 ABI caused a
+>   `possibly_broken_reent` flag + boot hang); `CThread`/logging are vendored
+>   in `src/`.
+> - Loads on Aroma **without** the "outdated" warning, and no longer hangs the
+>   console at boot.
+> - Runs inside games and **exits cleanly** back to the Wii U Menu (fixed a
+>   `HeartBeatServer` `join()` deadlock that froze the menu on exit).
+> - The **network transport works**: TCP heartbeat (port 8092) + a rewritten,
+>   loss-tolerant chunked UDP protocol (per-frame id + chunk index/count, each
+>   datagram ≤ MTU). Frames arrive, pass CRC32, and decode at ~10 fps. The
+>   matching client change lives in a patched
+>   [StreamingPluginClient](https://github.com/Maschell/StreamingPluginClient)
+>   (recv buffer + per-frame chunk reassembly).
+>
+> **What does NOT work (the blocker):**
+> - The **GX2 screen capture produces garbage** — the client shows static/noise,
+>   not the game. Because the frames pass CRC, the bytes are transmitted
+>   perfectly; the plugin is simply encoding the wrong pixels. Capturing at the
+>   source's native resolution (instead of a forced downscale, since
+>   `GX2CopySurface` does not scale) did **not** fix it, so the issue is deeper
+>   in the capture/de-tiling/pixel-format path (`stream_utils.cpp` `copyBuffer`
+>   / `EncodingHelper` `convertToJpeg`). This is where a future attempt should
+>   focus.
+>
+> Tested on a real Wii U (US) running Aroma with a WiFi (not wired) connection.
+> If you pick this up and get a real image out of the GX2 capture, please open
+> an issue — that's the one missing piece.
 
 ## Still an early PROOF OF CONCEPT. DON'T EXPECT MAGIC.
 
