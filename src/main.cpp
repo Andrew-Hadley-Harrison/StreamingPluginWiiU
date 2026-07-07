@@ -1,6 +1,9 @@
 #include <wups.h>
 #include <nsysnet/_socket.h>
 #include <coreinit/title.h>
+#include <coreinit/thread.h>
+#include <coreinit/time.h>
+#include <thread>
 #include <utils/logger.h>
 #include "retain_vars.hpp"
 #include "EncodingHelper.h"
@@ -42,15 +45,26 @@ INITIALIZE_PLUGIN() {
 ON_APPLICATION_START() {
     DEBUG_FUNCTION_LINE("ON_APPLICATION_START fired\n");
 
-    // Stay completely passive in the Wii U Menu / system apps: no sockets, no
-    // threads, and gAppStatus stays BACKGROUND so the GX2 hook does nothing.
+    gAppStatus = APP_STATUS_FOREGROUND;
+
     if (isSystemMenuTitle()) {
-        gAppStatus = APP_STATUS_BACKGROUND;
+        // Starting sockets/threads synchronously during the Wii U Menu's early
+        // boot hangs the console. Defer it to a detached thread so the boot
+        // path never blocks: worst case the Menu stream just doesn't start,
+        // but the console still boots. Re-check the title after the delay in
+        // case the user already launched a game.
+        std::thread([]() {
+            OSSleepTicks(OSSecondsToTicks(3));
+            if (!isSystemMenuTitle()) {
+                return; // left the Menu already; the game path handles startup
+            }
+            socket_lib_init();
+            startStreaming();
+        }).detach();
         return;
     }
 
     socket_lib_init();
-    gAppStatus = APP_STATUS_FOREGROUND;
     startStreaming();
 }
 

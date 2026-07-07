@@ -117,20 +117,13 @@ bool streamVideo(GX2ColorBuffer *srcBuffer) {
     //DEBUG_FUNCTION_LINE("allocated at %08X\n",colorBuffer);
     memset(colorBuffer,0,sizeof(GX2ColorBuffer));
 
-    // keep dimensions
-
-    uint32_t width = 640/2;
-    uint32_t height = 360/2;
-
-    if(gResolution == WUPS_STREAMING_RESOLUTION_480P) {
-        width = 854;
-        height = 480;
-    } else  if(gResolution == WUPS_STREAMING_RESOLUTION_360P) {
-        width = 640;
-        height = 360;
-    } else {
-
-    }
+    // Capture at the source framebuffer's NATIVE resolution. GX2CopySurface
+    // does not scale, so forcing a smaller target (e.g. 320x180) made it copy
+    // a mismatched region -> garbage/static on the client. Matching the source
+    // size makes the copy valid so we get a real image. (Downscaling for
+    // bandwidth can be added later as a proper scaled blit.)
+    uint32_t width  = srcBuffer->surface.width;
+    uint32_t height = srcBuffer->surface.height;
 
     bool valid = copyBuffer(srcBuffer,colorBuffer,width,height);
     if(!valid) {
