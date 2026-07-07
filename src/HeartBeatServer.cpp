@@ -36,12 +36,14 @@ void HeartBeatServer::run() {
         if (mjpegStreamServer) { delete mjpegStreamServer; mjpegStreamServer = NULL; }
         mjpegStreamServer = MJPEGStreamServerUDP::createInstance(cli.sin_addr.s_addr, htons(DEFAULT_UDP_CLIENT_PORT));
         EncodingHelper::getInstance()->setMJPEGStreamServer(mjpegStreamServer);
+        connected = true;
         while (!shouldExit) {
             unsigned char b;
             int r = recv(clientfd, &b, 1, 0);
             if (r <= 0) break;
             if (b == 0x15) { unsigned char pong = 0x16; send(clientfd, &pong, 1, 0); }
         }
+        connected = false;
         EncodingHelper::getInstance()->setMJPEGStreamServer(NULL);
         if (mjpegStreamServer) { delete mjpegStreamServer; mjpegStreamServer = NULL; }
         close(clientfd);
