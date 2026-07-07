@@ -13,8 +13,10 @@ DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer, const GX2ColorBuffer *colorB
         if(gScreen == WUPS_STREAMING_SCREEN_TV){
             use_scan_target = 1;
         }
-        if(scan_target == use_scan_target  /*&&  (count++ % 4 == 0)*/  && colorBuffer != NULL ) {
-            count = 0;
+        // Throttle: only stream every 3rd frame. Streaming every frame floods
+        // the Wii U's WiFi/socket buffers -> UDP packet loss -> CRC mismatch on
+        // the client -> black screen. (count only advances on matching frames.)
+        if(scan_target == use_scan_target  &&  (count++ % 3 == 0)  && colorBuffer != NULL ) {
             streamVideo((GX2ColorBuffer *)colorBuffer);
         }
     }

@@ -16,21 +16,25 @@ WUPS_PLUGIN_LICENSE("GPL");
 WUPS_USE_WUT_DEVOPTAB();
 
 static void startStreaming() {
+    DEBUG_FUNCTION_LINE("startStreaming: begin\n");
     EncodingHelper::destroyInstance();
     EncodingHelper::getInstance()->StartAsyncThread();
     EncodingHelper::getInstance()->setMJPEGStreamServer(HeartBeatServer::getInstance()->getMJPEGServer());
+    DEBUG_FUNCTION_LINE("startStreaming: done, heartbeat server should be listening\n");
 }
 
 // Gets called once the loader exists.
 INITIALIZE_PLUGIN() {
     socket_lib_init();
     log_init();
+    DEBUG_FUNCTION_LINE("INITIALIZE_PLUGIN fired\n");
 }
 
 // Called whenever an application was started.
 ON_APPLICATION_START() {
     socket_lib_init();
     log_init();
+    DEBUG_FUNCTION_LINE("ON_APPLICATION_START fired\n");
 
     gAppStatus = APP_STATUS_FOREGROUND;
     startStreaming();

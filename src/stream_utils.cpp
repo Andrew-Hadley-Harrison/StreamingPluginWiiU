@@ -93,9 +93,9 @@ bool copyBuffer(GX2ColorBuffer * sourceBuffer, GX2ColorBuffer * targetBuffer, ui
 
 uint32_t frame_counter = 0;
 uint32_t frame_counter_skipped = 0;
-int32_t curQuality = 50;
-int32_t minQuality = 40;
-int32_t maxQuality = 85;
+int32_t curQuality = 40;
+int32_t minQuality = 25;
+int32_t maxQuality = 55;
 int32_t stepQuality = 1;
 int32_t maxFrameDropsQuality = 20;
 int32_t minFrameDropsQuality = 95;
